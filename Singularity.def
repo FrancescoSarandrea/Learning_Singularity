@@ -1,0 +1,60 @@
+Bootstrap: docker
+From: docker.io/dvrbanec/rucio-client:latest
+
+%files
+    /ceph/hpc/home/sarandreaf/GWs_Download/egi-trustanchors.repo /etc/yum.repos.d/egi-trustanchors.repo
+    /ceph/hpc/home/sarandreaf/GWs_Download/data-kit-edu-rockylinux9.repo /etc/yum.repos.d/data-kit-edu-rockylinux9.repo
+    /ceph/hpc/home/sarandreaf/GWs_Download/get-token.sh /root/get-token.sh
+    /ceph/hpc/home/sarandreaf/GWs_Download/add-egi.sh /root/add-egi.sh
+    /ceph/hpc/home/sarandreaf/GWs_Download/refresh-egi.sh /root/refresh-egi.sh
+    /ceph/hpc/home/sarandreaf/GWs_Download/delete-egi.sh /root/delete-egi.sh
+    /ceph/hpc/home/sarandreaf/GWs_Download/setup.sh /root/setup.sh
+    /ceph/hpc/home/sarandreaf/GWs_Download/rucio.cfg /root/rucio.cfg
+    /ceph/hpc/home/sarandreaf/GWs_Download/virgo.voms /root/virgo.voms
+    /ceph/hpc/home/sarandreaf/GWs_Download/usercert.pem /root/.globus/usercert.pem
+    /ceph/hpc/home/sarandreaf/GWs_Download/userkey.pem /root/.globus/userkey.pem
+    /ceph/hpc/home/sarandreaf/GWs_Download/channels_length_units.txt /root/channels_length_units.txt
+    /ceph/hpc/home/sarandreaf/GWs_Download/gspy_O3a_Scattered_Light_V1.csv /root/gspy_O3a_Scattered_Light_V1.csv
+    /ceph/hpc/home/sarandreaf/GWs_Download/O3_raw_CNAF.txt /root/O3_raw_CNAF.txt
+    /ceph/hpc/home/sarandreaf/GWs_Download/download-cnaf-for-Zenodo_TEST.py /root/download-cnaf-for-Zenodo_TEST.py
+    /ceph/hpc/home/sarandreaf/GWs_Download/already_downloaded_gwf.txt /root/already_downloaded_gwf.txt
+
+%post
+    # Install necessary packages
+    yum install -y python3-gfal2 gfal2-plugin-file gfal2-plugin-gridftp gfal2-plugin-http gfal2-plugin-srm gfal2-plugin-xrootd xrootd-client gfal2-util
+    yum install -y voms-clients
+    yum install -y ca-policy-egi-core
+    yum install -y oidc-agent oidc-agent-cli
+    yum install -y python3 python3-pip
+    dnf clean all
+    pip3 install --no-cache-dir gwpy pandas dask
+    pip3 install dask[complete]
+    pip3 install lalsuite
+    yum install -y vim
+    dnf clean all
+    yum install -y expect
+# Ensure correct permissions for .globus directory
+    chmod 600 /root/.globus/userkey.pem
+    chmod 644 /root/.globus/usercert.pem
+
+%environment
+    export OIDC_SOCK=/tmp/oidc-agent.sock
+    export RUCIO_CONFIG=/root/rucio.cfg
+    export OIDC_ENCRYPTION_PW=intertwin
+    export X509_USER_CERT=/root/.globus/usercert.pem
+    export X509_USER_KEY=/root/.globus/userkey.pem
+
+%runscript
+    exec /bin/bash "$@"
+
+%startscript
+    export OIDC_SOCK=/tmp/oidc-agent.sock
+    oidc-agent > /tmp/oidc-agent.log 2>&1 &
+    exec /bin/bash "$@"
+
+%test
+    export OIDC_SOCK=/tmp/oidc-agent.sock
+    if ! oidc-agent --version; then
+        echo "oidc-agent failed to start"
+        exit 1
+    fi
